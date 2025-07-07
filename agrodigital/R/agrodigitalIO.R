@@ -74,6 +74,8 @@ download_data <- function(station_id) {
 
   return(df)
 }
+
+
 #' Query available fields from the Agrodigital.io API
 #'
 #' @return A data frame with the fields and their attributes.
@@ -82,54 +84,44 @@ query_fields <- function() {
   # Check if API token is set
   check_api_token()
 
-  # Base URL for the API
-  base_url <- "https://agrodigital.io/api/fields/"
+  # API endpoint
+  url <- "https://agrodigital.io/api/fields/"
 
-  # Get the API token
+  # Get token and make request
   token <- get_api_token()
+  response <- httr::GET(url, httr::add_headers(Authorization = paste0("Token ", token)))
 
-  # Send a GET request to the API
-  response <- httr::GET(base_url, httr::add_headers(Authorization = paste0("Token ", token)))
-
-  # Check for HTTP error
+  # Check for errors
   if (httr::http_error(response)) {
     print(response)
-    stop("An error occurred while trying to query the fields.")
+    stop("An error occurred while querying fields.")
   }
 
-  # Parse JSON content
+  # Parse response
   data <- httr::content(response, as = "parsed")
 
-  # Handle empty list
+  # Handle empty response
   if (length(data) == 0) {
-    warning("No fields found.")
+    warning("No fields returned.")
     return(data.frame())
   }
 
-  # Safely convert each item to a data.frame
-  data_list <- lapply(data, function(x) {
-    if (length(x) == 0 || is.null(x)) return(NULL)
+  # Convert to data.frame
+  df <- do.call(rbind, lapply(data, function(x) {
+    # Replace NULLs with NA
     x[sapply(x, is.null)] <- NA
-    tryCatch(as.data.frame(x, stringsAsFactors = FALSE), error = function(e) NULL)
-  })
 
-  # Remove NULLs or failed parses
-  data_list <- Filter(Negate(is.null), data_list)
+    # Convert list fields to comma-separated strings
+    x$access <- if (length(x$access) == 0) NA else paste(x$access, collapse = ",")
+    x$polygons <- if (length(x$polygons) == 0) NA else paste(x$polygons, collapse = ",")
 
-  # Check again in case all were removed
-  if (length(data_list) == 0) {
-    warning("All field entries were empty or invalid.")
-    return(data.frame())
-  }
+    as.data.frame(x, stringsAsFactors = FALSE)
+  }))
 
-  # Bind rows
-  df <- do.call(rbind, data_list)
-
-  # Reset rownames
   rownames(df) <- NULL
-
   return(df)
 }
+
 
 
 #' Query rasters from the AgroDigital API
