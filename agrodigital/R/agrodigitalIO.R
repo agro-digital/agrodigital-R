@@ -75,6 +75,45 @@ download_data <- function(station_id) {
   return(df)
 }
 
+#' Query available fields from the Agrodigital.io API
+#'
+#' @return A data frame with the fields and their attributes.
+#' @export
+query_fields <- function() {
+  # Check if API token is set
+  check_api_token()
+
+  # Base URL for the API
+  base_url <- "https://agrodigital.io/api/fields/"
+
+  # Get the API token
+  token <- get_api_token()
+
+  # Send a GET request to the API
+  response <- httr::GET(base_url, httr::add_headers(Authorization = paste0("Token ", token)))
+
+  # Check the status of the response
+  if (httr::http_error(response)) {
+    print(response)
+    stop("An error occurred while trying to query the fields.")
+  }
+
+  # Parse the response as JSON
+  data <- httr::content(response, as = "parsed")
+
+  # Convert the list of fields to a data frame
+  df <- do.call(rbind, lapply(data, function(x) {
+    # Replace NULLs with NAs for consistent data frame structure
+    x[sapply(x, is.null)] <- NA
+    as.data.frame(x, stringsAsFactors = FALSE)
+  }))
+
+  # Reset row names
+  rownames(df) <- NULL
+
+  return(df)
+}
+
 #' Query rasters from the AgroDigital API
 #'
 #' @param field_id The ID of the field to download data for.
